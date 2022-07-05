@@ -1,0 +1,19 @@
+[package]
+name = "aws-volume-mounter"
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.62"
+readme = "README.md"
+
+[[bin]]
+name = "aws-volume-mounter"
+path = "src/main.rs"
+
+[dependencies]
+aws-manager = "0.0.5"
+aws-sdk-ec2 = "0.15.0"
+clap = { version = "3.2.8", features = ["cargo", "derive"] }
+command-manager = "0.0.1"
+env_logger = "0.9.0"
+log = "0.4.17"
+tokio = { version = "1.19.2", features = ["full"] }
