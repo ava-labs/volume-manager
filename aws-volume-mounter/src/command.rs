@@ -1,4 +1,5 @@
 use std::{
+    fs,
     io::{self, Error, ErrorKind},
     time::Duration,
 };
@@ -148,26 +149,42 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     log::info!("successfully polled volume {:?}", volume);
 
     ec2::disk::make_filesystem(&opts.filesystem_name, &opts.block_device_name)?;
+
+    log::info!("mkdir {}", opts.mount_directory_path);
+    fs::create_dir_all(&opts.mount_directory_path)?;
+
     ec2::disk::mount_filesystem(
         &opts.filesystem_name,
         &opts.block_device_name,
         &opts.mount_directory_path,
     )?;
+
     ec2::disk::update_fstab(
         &opts.filesystem_name,
         &opts.block_device_name,
         &opts.mount_directory_path,
     )?;
 
+    log::info!("mounting all");
+    command_manager::run("sudo mount --all")?;
+
     let (blk_lists, _) = command_manager::run("lsblk")?;
     println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
-    assert!(blk_lists.contains(&opts.block_device_name));
+    assert!(blk_lists.contains(strip_dev(&opts.block_device_name)));
     assert!(blk_lists.contains(&opts.mount_directory_path));
 
     let (df_output, _) = command_manager::run("df -h")?;
     println!("\n\n'df -h' output:\n\n{}\n", blk_lists);
-    assert!(df_output.contains(&opts.block_device_name));
+    assert!(df_output.contains(strip_dev(&opts.block_device_name)));
     assert!(df_output.contains(&opts.mount_directory_path));
 
     Ok(())
+}
+
+pub fn strip_dev(s: &str) -> &str {
+    if s.len() >= 5 && &s[0..5] == "/dev/" {
+        &s[5..]
+    } else {
+        s
+    }
 }
