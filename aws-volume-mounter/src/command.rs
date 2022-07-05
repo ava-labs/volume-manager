@@ -178,6 +178,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     assert!(df_output.contains(strip_dev(&opts.block_device_name)));
     assert!(df_output.contains(&opts.mount_directory_path));
 
+    log::info!("successfully mounted the volume!");
     Ok(())
 }
 
