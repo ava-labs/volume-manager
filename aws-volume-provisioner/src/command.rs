@@ -31,7 +31,7 @@ e.g.,
 $ aws-volume-provisioner \
 --log-level=info \
 --kind-tag=aws-volume-provisioner \
---cluster-id-tag=TEST-ID \
+--id-tag=TEST-ID \
 --volume-type=gp3 \
 --volume-size=400 \
 --volume-iops=3000 \
@@ -64,9 +64,9 @@ $ aws-volume-provisioner \
                 .allow_invalid_utf8(false),
         )
         .arg(
-            Arg::new("CLUSTER_ID_TAG")
-                .long("cluster-id-tag")
-                .help("Sets the cluster Id")
+            Arg::new("ID_TAG")
+                .long("id-tag")
+                .help("Sets the Id tag")
                 .required(true)
                 .takes_value(true)
                 .allow_invalid_utf8(false),
@@ -142,7 +142,7 @@ pub struct Flags {
     pub log_level: String,
 
     pub kind: String,
-    pub cluster_id: String,
+    pub id: String,
 
     pub volume_type: String,
     pub volume_size: i32,
@@ -180,12 +180,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     })?;
 
     log::info!(
-        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and cluster Id '{}' (for reuse)",
+        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and Id '{}' (for reuse)",
         shared_config.region(),
         az,
         opts.ebs_device_name,
         ec2_instance_id,
-        opts.cluster_id
+        opts.id
     );
 
     // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
@@ -218,8 +218,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .set_values(Some(vec![opts.kind.clone()]))
             .build(),
         Filter::builder()
-            .set_name(Some(String::from("tag:ClusterId")))
-            .set_values(Some(vec![opts.cluster_id.clone()]))
+            .set_name(Some(String::from("tag:Id")))
+            .set_values(Some(vec![opts.id.clone()]))
             .build(),
         Filter::builder()
             .set_name(Some(String::from("volume-type")))
@@ -235,7 +235,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     let volume_attached = volumes.len() == 1;
     if !volume_attached {
-        log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and cluster Id '{}'", ec2_instance_id, az, opts.cluster_id);
+        log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id);
 
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
         let filters: Vec<Filter> = vec![
@@ -253,8 +253,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .set_values(Some(vec![opts.kind.clone()]))
                 .build(),
             Filter::builder()
-                .set_name(Some(String::from("tag:ClusterId")))
-                .set_values(Some(vec![opts.cluster_id.clone()]))
+                .set_name(Some(String::from("tag:Id")))
+                .set_values(Some(vec![opts.id.clone()]))
                 .build(),
             Filter::builder()
                 .set_name(Some(String::from("volume-type")))
@@ -269,12 +269,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             })?;
 
         if !volumes.is_empty() {
-            log::info!("found available volume for AZ '{}' and cluster Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.cluster_id, volumes[0]);
+            log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
         } else {
             log::info!(
-                "no available volume for AZ '{}' and cluster Id '{}', creating one in the AZ with size {}, IOPS {}, throughput {}",
+                "no available volume for AZ '{}' and Id '{}', creating one in the AZ with size {}, IOPS {}, throughput {}",
                 az,
-                opts.cluster_id,
+                opts.id,
                 opts.volume_size,
                 opts.volume_iops,
                 opts.volume_throughput,
@@ -300,8 +300,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                         )
                         .tags(
                             Tag::builder()
-                                .key(String::from("ClusterId"))
-                                .value(opts.cluster_id.clone())
+                                .key(String::from("Id"))
+                                .value(opts.id.clone())
                                 .build(),
                         )
                         .build(),

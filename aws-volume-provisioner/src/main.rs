@@ -9,8 +9,10 @@ async fn main() -> io::Result<()> {
     let matches = command::new().get_matches();
 
     let log_level = matches.value_of("LOG_LEVEL").unwrap_or("info").to_string();
+
     let kind = matches.value_of("KIND_TAG").unwrap().to_string();
-    let cluster_id = matches.value_of("CLUSTER_ID_TAG").unwrap().to_string();
+    let id = matches.value_of("ID_TAG").unwrap().to_string();
+
     let volume_type = matches.value_of("VOLUME_TYPE").unwrap_or("gp3").to_string();
     let volume_size = matches.value_of("VOLUME_SIZE").unwrap_or("400");
     let volume_size = volume_size.parse::<i32>().unwrap();
@@ -41,7 +43,7 @@ async fn main() -> io::Result<()> {
     let opts = command::Flags {
         log_level,
         kind,
-        cluster_id,
+        id,
         volume_type,
         volume_size,
         volume_iops,
