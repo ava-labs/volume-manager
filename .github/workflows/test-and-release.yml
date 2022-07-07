@@ -148,7 +148,7 @@ jobs:
         uses: actions-rs/cargo@v1
         with:
           command: build
-          args: --release --bin aws-volume-mounter --target ${{ matrix.job.target }}
+          args: --release --bin aws-volume-mounter --bin aws-volume-provisioner --target ${{ matrix.job.target }}
 
       - name: Compress binaries
         id: release_artifacts
@@ -165,12 +165,23 @@ jobs:
             tar -czvf aws-volume-mounter_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-mounter
             echo "::set-output name=file_name_aws_volume_mounter_tar_gz::aws-volume-mounter_${TARGET}.tar.gz"
 
+            ./target/${TARGET}/release/aws-volume-provisioner --help
+            cp ./target/${TARGET}/release/aws-volume-provisioner aws-volume-provisioner.${TARGET}
+            echo "::set-output name=file_name_aws_volume_provisioner::aws-volume-provisioner.${TARGET}"
+            tar -czvf aws-volume-provisioner_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
+            echo "::set-output name=file_name_aws_volume_provisioner_tar_gz::aws-volume-provisioner_${TARGET}.tar.gz"
+
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
 
             cp ./target/${TARGET}/release/aws-volume-mounter aws-volume-mounter.${TARGET}
             echo "::set-output name=file_name_aws_volume_mounter::aws-volume-mounter.${TARGET}"
             gtar -czvf aws-volume-mounter_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-mounter
             echo "::set-output name=file_name_aws_volume_mounter_tar_gz::aws-volume-mounter_${TARGET}.tar.gz"
+
+            cp ./target/${TARGET}/release/aws-volume-provisioner aws-volume-provisioner.${TARGET}
+            echo "::set-output name=file_name_aws_volume_provisioner::aws-volume-provisioner.${TARGET}"
+            gtar -czvf aws-volume-provisioner_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
+            echo "::set-output name=file_name_aws_volume_provisioner_tar_gz::aws-volume-provisioner_${TARGET}.tar.gz"
 
           else
 
@@ -192,6 +203,8 @@ jobs:
           files: |
             ${{ steps.release_artifacts.outputs.file_name_aws_volume_mounter }}
             ${{ steps.release_artifacts.outputs.file_name_aws_volume_mounter_tar_gz }}
+            ${{ steps.release_artifacts.outputs.file_name_aws_volume_provisioner }}
+            ${{ steps.release_artifacts.outputs.file_name_aws_volume_provisioner_tar_gz }}
 
       # release only for tags
       # https://github.com/softprops/action-gh-release
@@ -208,3 +221,5 @@ jobs:
           files: |
             ${{ steps.release_artifacts.outputs.file_name_aws_volume_mounter }}
             ${{ steps.release_artifacts.outputs.file_name_aws_volume_mounter_tar_gz }}
+            ${{ steps.release_artifacts.outputs.file_name_aws_volume_provisioner }}
+            ${{ steps.release_artifacts.outputs.file_name_aws_volume_provisioner_tar_gz }}
