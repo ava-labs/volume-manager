@@ -304,6 +304,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                                 .value(opts.id.clone())
                                 .build(),
                         )
+                        .tags(
+                            Tag::builder()
+                                .key(String::from("Name"))
+                                .value(opts.id.clone())
+                                .build(),
+                        )
                         .build(),
                 )
                 .send()
