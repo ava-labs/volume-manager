@@ -30,7 +30,8 @@ e.g.,
 
 $ aws-volume-provisioner \
 --log-level=info \
---cluster-id=TEST-ID \
+--kind-tag=aws-volume-provisioner \
+--cluster-id-tag=TEST-ID \
 --volume-type=gp3 \
 --volume-size=400 \
 --volume-iops=3000 \
