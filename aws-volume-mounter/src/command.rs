@@ -1,12 +1,12 @@
 use std::{
     fs,
     io::{self, Error, ErrorKind},
-    time::Duration,
 };
 
 use aws_manager::{self, ec2};
 use aws_sdk_ec2::model::VolumeAttachmentState;
 use clap::{crate_version, Arg, Command};
+use tokio::time::Duration;
 
 pub const NAME: &str = "aws-volume-mounter";
 
