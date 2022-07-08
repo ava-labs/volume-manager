@@ -236,8 +236,16 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     log::info!("found {} attached volume", volumes.len());
 
+    // only make filesystem (format) for initial creation
+    // do not format volume for already attached EBS volumes
+    // do not format volume for reused EBS volumes
+    let mut need_mkfs = true;
+
     let volume_attached = volumes.len() == 1;
-    if !volume_attached {
+    if volume_attached {
+        need_mkfs = false;
+        log::info!("no need mkfs because the local EC2 instance already has an volume attached");
+    } else {
         log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id);
 
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
@@ -272,6 +280,9 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             })?;
 
         if !volumes.is_empty() {
+            need_mkfs = false;
+            log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance");
+
             log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
         } else {
             log::info!(
@@ -371,7 +382,11 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         })?;
     log::info!("successfully polled volume {:?}", volume);
 
-    ec2::disk::make_filesystem(&opts.filesystem_name, &opts.block_device_name)?;
+    if need_mkfs {
+        ec2::disk::make_filesystem(&opts.filesystem_name, &opts.block_device_name)?;
+    } else {
+        log::info!("skipped mkfs to retain existing data");
+    }
 
     log::info!("mkdir {}", opts.mount_directory_path);
     fs::create_dir_all(&opts.mount_directory_path)?;
