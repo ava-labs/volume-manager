@@ -1,6 +1,7 @@
 use std::{
-    fs,
+    env, fs,
     io::{self, Error, ErrorKind},
+    path::{Path, PathBuf},
 };
 
 use aws_manager::{self, ec2};
@@ -8,7 +9,9 @@ use aws_sdk_ec2::model::{
     Filter, ResourceType, Tag, TagSpecification, VolumeAttachmentState, VolumeState, VolumeType,
 };
 use clap::{crate_version, Arg, Command};
+use path_clean::PathClean;
 use tokio::time::{sleep, Duration};
+use walkdir::WalkDir;
 
 pub const NAME: &str = "aws-volume-provisioner";
 
@@ -398,6 +401,26 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     assert!(df_output.contains(strip_dev(&opts.block_device_name)));
     assert!(df_output.contains(&opts.mount_directory_path));
 
+    let mut cnt = 0;
+    for entry in WalkDir::new(&opts.mount_directory_path).into_iter() {
+        let entry = match entry {
+            Ok(v) => v,
+            Err(e) => {
+                return Err(Error::new(
+                    ErrorKind::Other,
+                    format!("failed walk dir {} ({})", opts.mount_directory_path, e),
+                ));
+            }
+        };
+
+        let full_path = absolute_path(entry.path())?;
+        log::info!("listing mounted directory: '{:?}'", full_path);
+        cnt += 1;
+        if cnt > 20 {
+            break;
+        }
+    }
+
     log::info!("successfully mounted and provisioned the volume!");
     Ok(())
 }
@@ -408,4 +431,17 @@ pub fn strip_dev(s: &str) -> &str {
     } else {
         s
     }
+}
+
+fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
+    let p = path.as_ref();
+
+    let ap = if p.is_absolute() {
+        p.to_path_buf()
+    } else {
+        env::current_dir()?.join(p)
+    }
+    .clean();
+
+    Ok(ap)
 }
