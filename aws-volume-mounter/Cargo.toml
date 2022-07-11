@@ -10,7 +10,7 @@ name = "aws-volume-mounter"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = "0.0.6" # https://crates.io/crates/aws-manager/versions
+aws-manager = "0.0.8" # https://crates.io/crates/aws-manager/versions
 aws-sdk-ec2 = "0.15.0"
 clap = { version = "3.2.8", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
