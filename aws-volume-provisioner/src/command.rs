@@ -284,7 +284,6 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance");
             log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
         } else {
-            need_mkfs = true;
             log::info!(
                 "no available volume for AZ '{}' and Id '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
                 az,
