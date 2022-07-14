@@ -282,11 +282,11 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         if !volumes.is_empty() {
             need_mkfs = false;
             log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance");
-
             log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
         } else {
+            need_mkfs = true;
             log::info!(
-                "no available volume for AZ '{}' and Id '{}', creating one in the AZ with size {}, IOPS {}, throughput {}",
+                "no available volume for AZ '{}' and Id '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
                 az,
                 opts.id,
                 opts.volume_size,
@@ -330,7 +330,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .await
                 .unwrap();
             let volume_id = resp.volume_id().unwrap();
-            log::info!("created {}", volume_id);
+            log::info!("created an EBS volume '{}'", volume_id);
 
             sleep(Duration::from_secs(20)).await;
 
