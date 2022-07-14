@@ -293,6 +293,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 opts.volume_throughput,
             );
 
+            log::info!("sending 'create_volume' request with tags");
             // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html
             let resp = ec2_cli
                 .create_volume()
