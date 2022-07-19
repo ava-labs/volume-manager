@@ -169,13 +169,15 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     let ec2_manager = ec2::Manager::new(&shared_config);
     let ec2_cli = ec2_manager.client();
 
-    let az = ec2::fetch_availability_zone().await.map_err(|e| {
-        Error::new(
-            ErrorKind::Other,
-            format!("failed fetch_availability_zone '{}'", e),
-        )
-    })?;
-    let ec2_instance_id = ec2::fetch_instance_id().await.map_err(|e| {
+    let az = ec2::metadata::fetch_availability_zone()
+        .await
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!("failed fetch_availability_zone '{}'", e),
+            )
+        })?;
+    let ec2_instance_id = ec2::metadata::fetch_instance_id().await.map_err(|e| {
         Error::new(
             ErrorKind::Other,
             format!("failed fetch_instance_id '{}'", e),
