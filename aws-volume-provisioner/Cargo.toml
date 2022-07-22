@@ -1,18 +1,19 @@
 [package]
 name = "aws-volume-provisioner"
-version = "0.0.2"
+version = "0.0.3"
 edition = "2021"
 rust-version = "1.62"
 readme = "README.md"
+license = "Apache-2.0"
 
 [[bin]]
 name = "aws-volume-provisioner"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = "0.0.10" # https://crates.io/crates/aws-manager/versions
-aws-sdk-ec2 = "0.15.0"
-clap = { version = "3.2.12", features = ["cargo", "derive"] }
+aws-manager = "0.0.11" # https://crates.io/crates/aws-manager/versions
+aws-sdk-ec2 = "0.16.0"
+clap = { version = "3.2.14", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
 env_logger = "0.9.0"
 log = "0.4.17"
