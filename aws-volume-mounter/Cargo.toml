@@ -1,6 +1,6 @@
 [package]
 name = "aws-volume-mounter"
-version = "0.0.3"
+version = "0.0.4"
 edition = "2021"
 rust-version = "1.62"
 readme = "README.md"
@@ -10,10 +10,10 @@ name = "aws-volume-mounter"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = "0.0.11" # https://crates.io/crates/aws-manager/versions
+aws-manager = "0.0.12" # https://crates.io/crates/aws-manager/versions
 aws-sdk-ec2 = "0.16.0"
-clap = { version = "3.2.14", features = ["cargo", "derive"] }
+clap = { version = "3.2.16", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
 env_logger = "0.9.0"
 log = "0.4.17"
-tokio = { version = "1.20.0", features = ["full"] }
+tokio = { version = "1.20.1", features = ["full"] }
