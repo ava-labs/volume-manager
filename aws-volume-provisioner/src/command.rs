@@ -396,15 +396,11 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     log::info!("sleep before mounting the file system");
     sleep(Duration::from_secs(5)).await;
 
+    // check before mount
     let (blk_lists, _) = command_manager::run("lsblk")?;
     println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
-    assert!(blk_lists.contains(strip_dev(&opts.block_device_name)));
-    assert!(blk_lists.contains(&opts.mount_directory_path));
-
     let (df_output, _) = command_manager::run("df -h")?;
-    println!("\n\n'df -h' output:\n\n{}\n\n", blk_lists);
-    assert!(df_output.contains(strip_dev(&opts.block_device_name)));
-    assert!(df_output.contains(&opts.mount_directory_path));
+    println!("\n\n'df -h' output:\n\n{}\n\n", df_output);
 
     ec2::disk::mount_filesystem(
         &opts.filesystem_name,
@@ -421,13 +417,14 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     log::info!("mounting all");
     command_manager::run("sudo mount --all")?;
 
+    // check after mount
     let (blk_lists, _) = command_manager::run("lsblk")?;
     println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
     assert!(blk_lists.contains(strip_dev(&opts.block_device_name)));
     assert!(blk_lists.contains(&opts.mount_directory_path));
 
     let (df_output, _) = command_manager::run("df -h")?;
-    println!("\n\n'df -h' output:\n\n{}\n\n", blk_lists);
+    println!("\n\n'df -h' output:\n\n{}\n\n", df_output);
     assert!(df_output.contains(strip_dev(&opts.block_device_name)));
     assert!(df_output.contains(&opts.mount_directory_path));
 

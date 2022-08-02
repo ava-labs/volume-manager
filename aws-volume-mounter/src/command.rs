@@ -174,7 +174,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     assert!(blk_lists.contains(&opts.mount_directory_path));
 
     let (df_output, _) = command_manager::run("df -h")?;
-    println!("\n\n'df -h' output:\n\n{}\n", blk_lists);
+    println!("\n\n'df -h' output:\n\n{}\n", df_output);
     assert!(df_output.contains(strip_dev(&opts.block_device_name)));
     assert!(df_output.contains(&opts.mount_directory_path));
 
