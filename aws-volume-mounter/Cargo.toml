@@ -11,7 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 aws-manager = "0.0.12" # https://crates.io/crates/aws-manager/versions
-aws-sdk-ec2 = "0.16.0"
+aws-sdk-ec2 = "0.17.0"
 clap = { version = "3.2.16", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
 env_logger = "0.9.0"
