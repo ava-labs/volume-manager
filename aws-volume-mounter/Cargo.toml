@@ -1,18 +1,19 @@
 [package]
 name = "aws-volume-mounter"
-version = "0.0.4"
+version = "0.0.5"
 edition = "2021"
-rust-version = "1.62"
+rust-version = "1.63"
 readme = "README.md"
+license = "Apache-2.0"
 
 [[bin]]
 name = "aws-volume-mounter"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = "0.0.12" # https://crates.io/crates/aws-manager/versions
-aws-sdk-ec2 = "0.16.0"
-clap = { version = "3.2.16", features = ["cargo", "derive"] }
+aws-manager = "0.0.13" # https://crates.io/crates/aws-manager/versions
+aws-sdk-ec2 = "0.17.0"
+clap = { version = "3.2.17", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
 env_logger = "0.9.0"
 log = "0.4.17"
