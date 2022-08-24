@@ -33,6 +33,7 @@ e.g.,
 
 $ aws-volume-provisioner \
 --log-level=info \
+--initial-wait-random-seconds=70 \
 --kind-tag=aws-volume-provisioner \
 --id-tag=TEST-ID \
 --volume-type=gp3 \
