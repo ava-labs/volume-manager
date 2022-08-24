@@ -266,8 +266,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     // do not format volume for reused EBS volumes
     let mut need_mkfs = true;
 
-    let volume_attached = volumes.len() == 1;
-    if volume_attached {
+    let attached_volume_exists = volumes.len() == 1;
+    if attached_volume_exists {
         need_mkfs = false;
         log::info!("no need mkfs because the local EC2 instance already has an volume attached");
     } else {
@@ -305,6 +305,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             })?;
 
         if !volumes.is_empty() {
+            // TODO: this can be racey when the other instance in the same AZ is in the process of provisioning
             need_mkfs = false;
             log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance");
             log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
@@ -357,7 +358,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             let volume_id = resp.volume_id().unwrap();
             log::info!("created an EBS volume '{}'", volume_id);
 
-            sleep(Duration::from_secs(20)).await;
+            sleep(Duration::from_secs(10)).await;
 
             let volume = ec2_manager
                 .poll_volume_state(
