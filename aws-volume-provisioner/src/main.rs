@@ -10,6 +10,11 @@ async fn main() -> io::Result<()> {
 
     let log_level = matches.value_of("LOG_LEVEL").unwrap_or("info").to_string();
 
+    let initial_wait_random_seconds = matches
+        .value_of("INITIAL_WAIT_RANDOM_SECONDS")
+        .unwrap_or("0");
+    let initial_wait_random_seconds = initial_wait_random_seconds.parse::<u32>().unwrap();
+
     let kind = matches.value_of("KIND_TAG").unwrap().to_string();
     let id = matches.value_of("ID_TAG").unwrap().to_string();
 
@@ -42,6 +47,7 @@ async fn main() -> io::Result<()> {
 
     let opts = command::Flags {
         log_level,
+        initial_wait_random_seconds,
         kind,
         id,
         volume_type,

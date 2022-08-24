@@ -59,6 +59,15 @@ $ aws-volume-provisioner \
                 .default_value("info"),
         )
         .arg(
+            Arg::new("INITIAL_WAIT_RANDOM_SECONDS")
+            .long("initial-wait-random-seconds")
+            .help("Sets the maximum number of seconds to wait (value chosen at random with the range)")
+            .required(false)
+            .takes_value(true)
+            .allow_invalid_utf8(false)
+            .default_value("0"),
+        )
+        .arg(
             Arg::new("KIND_TAG")
                 .long("kind-tag")
                 .help("Sets the kind tag")
@@ -143,6 +152,7 @@ $ aws-volume-provisioner \
 /// Defines flag options.
 pub struct Flags {
     pub log_level: String,
+    pub initial_wait_random_seconds: u32,
 
     pub kind: String,
     pub id: String,
@@ -183,6 +193,18 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             format!("failed fetch_instance_id '{}'", e),
         )
     })?;
+
+    let sleep_sec = if opts.initial_wait_random_seconds > 0 {
+        random_manager::u32() % opts.initial_wait_random_seconds
+    } else {
+        0
+    };
+    if sleep_sec > 0 {
+        log::info!("waiting for random seconds {}", sleep_sec);
+        sleep(Duration::from_secs(sleep_sec as u64)).await;
+    } else {
+        log::info!("skipping random sleep...");
+    }
 
     log::info!(
         "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and Id '{}' (for reuse)",
