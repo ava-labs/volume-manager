@@ -310,7 +310,6 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
         let mut reusable_volume_found_in_az = !volumes.is_empty();
 
-        // TODO:
         // if we don't check whether the other instance in the same AZ has "just" created
         // this EBS volume or not, this can be racey -- two instances may be trying to attach
         // the same EBS volume to two different instances at the same time
