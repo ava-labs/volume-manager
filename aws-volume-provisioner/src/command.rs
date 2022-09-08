@@ -8,6 +8,7 @@ use aws_manager::{self, ec2};
 use aws_sdk_ec2::model::{
     Filter, ResourceType, Tag, TagSpecification, VolumeAttachmentState, VolumeState, VolumeType,
 };
+use chrono::{DateTime, Utc};
 use clap::{crate_version, Arg, Command};
 use path_clean::PathClean;
 use tokio::time::{sleep, Duration};
@@ -259,17 +260,20 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         .await
         .map_err(|e| Error::new(ErrorKind::Other, format!("failed describe_volumes '{}'", e)))?;
 
-    log::info!("found {} attached volume", volumes.len());
+    log::info!(
+        "found {} attached volume for the local EC2 instance",
+        volumes.len()
+    );
 
     // only make filesystem (format) for initial creation
     // do not format volume for already attached EBS volumes
     // do not format volume for reused EBS volumes
     let mut need_mkfs = true;
 
-    let attached_volume_exists = volumes.len() == 1;
-    if attached_volume_exists {
-        need_mkfs = false;
+    let local_attached_volume_found = volumes.len() == 1;
+    if local_attached_volume_found {
         log::info!("no need mkfs because the local EC2 instance already has an volume attached");
+        need_mkfs = false;
     } else {
         log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id);
 
@@ -304,14 +308,84 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 Error::new(ErrorKind::Other, format!("failed describe_volumes '{}'", e))
             })?;
 
-        if !volumes.is_empty() {
-            // TODO: this can be racey when the other instance in the same AZ is in the process of provisioning
+        let mut reusable_volume_found_in_az = !volumes.is_empty();
+
+        // TODO:
+        // if we don't check whether the other instance in the same AZ has "just" created
+        // this EBS volume or not, this can be racey -- two instances may be trying to attach
+        // the same EBS volume to two different instances at the same time
+        if reusable_volume_found_in_az {
+            if let Some(tags) = volumes[0].tags() {
+                for tag in tags.iter() {
+                    if let Some(tag_key) = tag.key() {
+                        if !tag_key.eq(VOLUME_LEASE_HOLD_KEY) {
+                            continue;
+                        }
+
+                        let tag_val = tag.value().expect("unexpected empty tag value");
+                        log::info!("found leasing tag '{}' and '{}'", tag_key, tag_val);
+
+                        let (leasing_instance, leased_at) =
+                            parse_volume_lease_hold_key_value(tag_val)?;
+
+                        // only reuse iff:
+                        // (1) leased by the same local EC2 instance (restarted volume provisioner)
+                        // (2) leased by the other EC2 instance but >10-minute ago
+
+                        // (1) leased by the same local EC2 instance (restarted volume provisioner)
+                        if leasing_instance.eq(&ec2_instance_id) {
+                            reusable_volume_found_in_az = true;
+                            break;
+                        }
+
+                        let now: DateTime<Utc> = Utc::now();
+                        let now_unix = now.timestamp();
+                        let lease_delta = now_unix - leased_at;
+                        log::info!("lease timestamp delta is {}", lease_delta);
+
+                        if lease_delta > 600 {
+                            // (2) leased by the other EC2 instance but >10-minute ago
+                            reusable_volume_found_in_az = true;
+                            log::info!("lease delta from the other instance is over 10-minute, so we take over...")
+                        } else {
+                            log::info!("lease delta from the other instance is still within 10-minute, so we don't take over...")
+                        }
+
+                        break;
+                    }
+                }
+            }
+        }
+
+        let now: DateTime<Utc> = Utc::now();
+        let unix_ts = now.timestamp();
+
+        if reusable_volume_found_in_az {
+            log::info!("found reusable, available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
+
+            log::info!("updating lease holder tag key for the EBS volume...");
+
+            // ref. https://docs.aws.amazon.com/cli/latest/reference/ec2/create-tags.html
+            ec2_manager
+                .client()
+                .create_tags()
+                .resources(volumes[0].volume_id().unwrap())
+                .tags(
+                    Tag::builder()
+                        .key(VOLUME_LEASE_HOLD_KEY.to_string())
+                        .value(format!("{}_{}", ec2_instance_id.clone(), unix_ts))
+                        .build(),
+                )
+                .send()
+                .await
+                .map_err(|e| Error::new(ErrorKind::Other, format!("failed create_tags '{}'", e)))?;
+
+            // do not "mkfs" to retain the previous state
+            log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance, and retain previous state");
             need_mkfs = false;
-            log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance");
-            log::info!("found available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
         } else {
             log::info!(
-                "no available volume for AZ '{}' and Id '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
+                "no reusable, available volume for AZ '{}' and Id '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
                 az,
                 opts.id,
                 opts.volume_size,
@@ -320,6 +394,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             );
 
             log::info!("sending 'create_volume' request with tags");
+
             // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html
             let resp = ec2_cli
                 .create_volume()
@@ -348,6 +423,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                             Tag::builder()
                                 .key(String::from("Name"))
                                 .value(opts.id.clone())
+                                .build(),
+                        )
+                        .tags(
+                            Tag::builder()
+                                .key(VOLUME_LEASE_HOLD_KEY.to_string())
+                                .value(format!("{}_{}", ec2_instance_id.clone(), unix_ts))
                                 .build(),
                         )
                         .build(),
@@ -475,6 +556,41 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     log::info!("successfully mounted and provisioned the volume!");
     Ok(())
+}
+
+/// Tag key that presents the lease holder.
+/// The value is the instance ID and unix timestamps.
+/// For example, "i-12345678_1662596730" means "i-12345678" acquired the lease
+/// for this volume at the unix timestamp "1662596730".
+const VOLUME_LEASE_HOLD_KEY: &str = "LeaseHold";
+
+/// RUST_LOG=debug cargo test --package aws-volume-provisioner -- test_parse_volume_lease_hold_key_value --exact --show-output
+#[test]
+fn test_parse_volume_lease_hold_key_value() {
+    let _ = env_logger::builder().is_test(true).try_init();
+
+    let ec2_instance_id = "i-12345678";
+    let now: DateTime<Utc> = Utc::now();
+    let unix_ts = now.timestamp();
+
+    let k = format!("{}_{}", ec2_instance_id.clone(), unix_ts);
+    let (a, b) = parse_volume_lease_hold_key_value(&k).expect("failed to parse");
+
+    assert_eq!(ec2_instance_id, a);
+    assert_eq!(unix_ts, b);
+}
+
+pub fn parse_volume_lease_hold_key_value(s: &str) -> io::Result<(String, i64)> {
+    let ss: Vec<&str> = s.split("_").collect();
+    let ec2_instance_id = ss[0].to_string();
+
+    let unix_ts = ss[1].parse::<i64>().map_err(|e| {
+        Error::new(
+            ErrorKind::Other,
+            format!("failed parse unix timestamp '{}' '{}'", ss[1], e),
+        )
+    })?;
+    Ok((ec2_instance_id, unix_ts))
 }
 
 pub fn strip_dev(s: &str) -> &str {
