@@ -470,7 +470,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     sleep(Duration::from_secs(2)).await;
 
-    log::info!("now mount the attached EBS volume to the local EC2 instance");
+    log::info!("now mounting the attached EBS volume to the local EC2 instance");
     let volume = ec2_manager
         .poll_local_volume_by_attachment_state(
             None,
