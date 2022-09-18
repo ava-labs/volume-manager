@@ -14,11 +14,11 @@ path = "src/main.rs"
 aws-manager = "0.0.18" # https://crates.io/crates/aws-manager/versions
 aws-sdk-ec2 = "0.18.0"
 chrono = "0.4.22"
-clap = { version = "3.2.20", features = ["cargo", "derive"] }
+clap = { version = "3.2.22", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
-env_logger = "0.9.0"
+env_logger = "0.9.1"
 log = "0.4.17"
 path-clean = { version = "0.1.0", optional = false }
 random-manager = "0.0.1"
-tokio = { version = "1.21.0", features = ["full"] }
+tokio = { version = "1.21.1", features = ["full"] }
 walkdir = { version = "2.3.2", optional = false }
