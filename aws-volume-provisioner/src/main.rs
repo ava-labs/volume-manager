@@ -8,42 +8,58 @@ pub const APP_NAME: &str = "aws-volume-provisioner";
 async fn main() -> io::Result<()> {
     let matches = command::new().get_matches();
 
-    let log_level = matches.value_of("LOG_LEVEL").unwrap_or("info").to_string();
+    let log_level = matches
+        .get_one::<String>("LOG_LEVEL")
+        .unwrap_or(&String::from("info"))
+        .clone();
 
     let initial_wait_random_seconds = matches
-        .value_of("INITIAL_WAIT_RANDOM_SECONDS")
-        .unwrap_or("0");
-    let initial_wait_random_seconds = initial_wait_random_seconds.parse::<u32>().unwrap();
+        .get_one::<u32>("INITIAL_WAIT_RANDOM_SECONDS")
+        .unwrap_or(&5)
+        .clone();
 
-    let kind = matches.value_of("KIND_TAG").unwrap().to_string();
-    let id = matches.value_of("ID_TAG").unwrap().to_string();
+    let kind = matches.get_one::<String>("KIND_TAG").unwrap().clone();
+    let id = matches.get_one::<String>("ID_TAG").unwrap().clone();
 
-    let volume_type = matches.value_of("VOLUME_TYPE").unwrap_or("gp3").to_string();
-    let volume_size = matches.value_of("VOLUME_SIZE").unwrap_or("400");
-    let volume_size = volume_size.parse::<i32>().unwrap();
+    let volume_type = matches
+        .get_one::<String>("VOLUME_TYPE")
+        .unwrap_or(&String::from("gp3"))
+        .clone();
 
-    let volume_iops = matches.value_of("VOLUME_IOPS").unwrap_or("3000");
-    let volume_iops = volume_iops.parse::<i32>().unwrap();
+    let volume_size = matches
+        .get_one::<u32>("VOLUME_SIZE")
+        .unwrap_or(&400)
+        .clone();
+    assert!(volume_size < i32::MAX as u32);
 
-    let volume_throughput = matches.value_of("VOLUME_THROUGHPUT").unwrap_or("500");
-    let volume_throughput = volume_throughput.parse::<i32>().unwrap();
+    let volume_iops = matches
+        .get_one::<u32>("VOLUME_IOPS")
+        .unwrap_or(&3000)
+        .clone();
+    assert!(volume_iops < i32::MAX as u32);
+
+    let volume_throughput = matches
+        .get_one::<u32>("VOLUME_THROUGHPUT")
+        .unwrap_or(&500)
+        .clone();
+    assert!(volume_throughput < i32::MAX as u32);
 
     let ebs_device_name = matches
-        .value_of("EBS_DEVICE_NAME")
-        .unwrap_or("/dev/xvdb")
-        .to_string();
+        .get_one::<String>("EBS_DEVICE_NAME")
+        .unwrap_or(&String::from("/dev/xvdb"))
+        .clone();
     let block_device_name = matches
-        .value_of("BLOCK_DEVICE_NAME")
-        .unwrap_or("/dev/nvme1n1")
-        .to_string();
+        .get_one::<String>("BLOCK_DEVICE_NAME")
+        .unwrap_or(&String::from("/dev/nvme1n1"))
+        .clone();
     let filesystem_name = matches
-        .value_of("FILESYSTEM_NAME")
-        .unwrap_or("ext4")
-        .to_string();
+        .get_one::<String>("FILESYSTEM_NAME")
+        .unwrap_or(&String::from("ext4"))
+        .clone();
     let mount_directory_path = matches
-        .value_of("MOUNT_DIRECTORY_PATH")
-        .unwrap_or("/data")
-        .to_string();
+        .get_one::<String>("MOUNT_DIRECTORY_PATH")
+        .unwrap_or(&String::from("/data"))
+        .clone();
 
     let opts = command::Flags {
         log_level,

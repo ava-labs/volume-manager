@@ -9,14 +9,14 @@ use aws_sdk_ec2::model::{
     Filter, ResourceType, Tag, TagSpecification, VolumeAttachmentState, VolumeState, VolumeType,
 };
 use chrono::{DateTime, Utc};
-use clap::{crate_version, Arg, Command};
+use clap::{crate_version, value_parser, Arg, Command};
 use path_clean::PathClean;
 use tokio::time::{sleep, Duration};
 use walkdir::WalkDir;
 
 pub const NAME: &str = "aws-volume-provisioner";
 
-pub fn new() -> Command<'static> {
+pub fn new() -> Command {
     Command::new(NAME)
         .version(crate_version!())
         .about("Provisions the EBS volume to the local availability zone")
@@ -54,100 +54,94 @@ $ aws-volume-provisioner \
                 .short('l')
                 .help("Sets the log level")
                 .required(false)
-                .takes_value(true)
-                .possible_value("debug")
-                .possible_value("info")
-                .allow_invalid_utf8(false)
+                .num_args(1)
+                .value_parser(["debug", "info"])
                 .default_value("info"),
         )
         .arg(
             Arg::new("INITIAL_WAIT_RANDOM_SECONDS")
-            .long("initial-wait-random-seconds")
-            .help("Sets the maximum number of seconds to wait (value chosen at random with the range)")
-            .required(false)
-            .takes_value(true)
-            .allow_invalid_utf8(false)
-            .default_value("0"),
+                .long("initial-wait-random-seconds")
+                .help("Sets the maximum number of seconds to wait (value chosen at random with the range)")
+                .required(false)
+                .num_args(1)
+                .value_parser(value_parser!(u32))
+                .default_value("5"),
         )
         .arg(
             Arg::new("KIND_TAG")
                 .long("kind-tag")
                 .help("Sets the kind tag")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("ID_TAG")
                 .long("id-tag")
                 .help("Sets the Id tag")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("VOLUME_TYPE")
                 .long("volume-type")
                 .help("Sets the volume size in GB")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("VOLUME_SIZE")
                 .long("volume-size")
                 .help("Sets the volume size in GB")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .value_parser(value_parser!(u32))
+                .num_args(1)
+                .default_value("400"),
         )
         .arg(
             Arg::new("VOLUME_IOPS")
                 .long("volume-iops")
                 .help("Sets the volume IOPS")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .value_parser(value_parser!(u32))
+                .num_args(1)
+                .default_value("3000"),
         )
         .arg(
             Arg::new("VOLUME_THROUGHPUT")
                 .long("volume-throughput")
                 .help("Sets the volume throughput")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .value_parser(value_parser!(u32))
+                .num_args(1)
+                .default_value("500"),
         )
         .arg(
             Arg::new("EBS_DEVICE_NAME")
                 .long("ebs-device-name")
                 .help("Sets the EBS device name (e.g., /dev/xvdb)")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("BLOCK_DEVICE_NAME")
                 .long("block-device-name")
                 .help("Sets the OS-level block device name (e.g., /dev/nvme1n1)")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("FILESYSTEM_NAME")
                 .long("filesystem-name")
                 .help("Sets the filesystem name to create (e.g., ext4)")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
         .arg(
             Arg::new("MOUNT_DIRECTORY_PATH")
                 .long("mount-directory-path")
                 .help("Sets the directory path to mount onto the device")
                 .required(true)
-                .takes_value(true)
-                .allow_invalid_utf8(false),
+                .num_args(1),
         )
 }
 
@@ -160,9 +154,9 @@ pub struct Flags {
     pub id: String,
 
     pub volume_type: String,
-    pub volume_size: i32,
-    pub volume_iops: i32,
-    pub volume_throughput: i32,
+    pub volume_size: u32,
+    pub volume_iops: u32,
+    pub volume_throughput: u32,
 
     pub ebs_device_name: String,
     pub block_device_name: String,
@@ -401,9 +395,9 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .create_volume()
                 .availability_zone(az)
                 .volume_type(VolumeType::from(opts.volume_type.as_str()))
-                .size(opts.volume_size)
-                .iops(opts.volume_iops)
-                .throughput(opts.volume_throughput)
+                .size(opts.volume_size as i32)
+                .iops(opts.volume_iops as i32)
+                .throughput(opts.volume_throughput as i32)
                 .encrypted(true)
                 .tag_specifications(
                     TagSpecification::builder()
