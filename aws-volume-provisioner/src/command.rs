@@ -254,7 +254,16 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     let volumes = ec2_manager
         .describe_volumes(Some(filters))
         .await
-        .map_err(|e| Error::new(ErrorKind::Other, format!("failed describe_volumes '{}'", e)))?;
+        .map_err(|e| {
+            Error::new(
+                ErrorKind::Other,
+                format!(
+                    "failed ec2_manager.describe_volumes {} (retryable {})",
+                    e.message(),
+                    e.is_retryable()
+                ),
+            )
+        })?;
 
     log::info!(
         "found {} attached volume for the local EC2 instance",
@@ -301,7 +310,14 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .describe_volumes(Some(filters))
             .await
             .map_err(|e| {
-                Error::new(ErrorKind::Other, format!("failed describe_volumes '{}'", e))
+                Error::new(
+                    ErrorKind::Other,
+                    format!(
+                        "failed ec2_manager.describe_volumes {} (retryable {})",
+                        e.message(),
+                        e.is_retryable()
+                    ),
+                )
             })?;
 
         let mut reusable_volume_found_in_az = !volumes.is_empty();
@@ -430,7 +446,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 )
                 .send()
                 .await
-                .unwrap();
+                .map_err(|e| {
+                    Error::new(
+                        ErrorKind::Other,
+                        format!("failed ec2_cli.create_volume {}", e),
+                    )
+                })?;
             let volume_id = resp.volume_id().unwrap();
             log::info!("created an EBS volume '{}'", volume_id);
 
@@ -444,7 +465,16 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                     Duration::from_secs(5),
                 )
                 .await
-                .unwrap();
+                .map_err(|e| {
+                    Error::new(
+                        ErrorKind::Other,
+                        format!(
+                            "failed ec2_manager.poll_volume_state {} (retryable {})",
+                            e.message(),
+                            e.is_retryable()
+                        ),
+                    )
+                })?;
             log::info!("polled volume after create: {:?}", volume);
 
             volumes.push(volume.unwrap());
@@ -461,7 +491,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .instance_id(ec2_instance_id)
             .send()
             .await
-            .unwrap();
+            .map_err(|e| {
+                Error::new(
+                    ErrorKind::Other,
+                    format!("failed ec2_cli.attach_volume {}", e),
+                )
+            })?;
     }
 
     sleep(Duration::from_secs(2)).await;
@@ -479,7 +514,11 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         .map_err(|e| {
             Error::new(
                 ErrorKind::Other,
-                format!("failed poll_local_volume_by_attachment_state '{}'", e),
+                format!(
+                    "failed ec2_manager.poll_local_volume_by_attachment_state {} (retryable {})",
+                    e.message(),
+                    e.is_retryable()
+                ),
             )
         })?;
     log::info!("successfully polled volume {:?}", volume);
@@ -520,12 +559,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     // check after mount
     let (blk_lists, _) = command_manager::run("lsblk")?;
     println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
-    assert!(blk_lists.contains(strip_dev(&opts.block_device_name)));
+    assert!(blk_lists.contains(&opts.block_device_name.trim_start_matches("/dev/")));
     assert!(blk_lists.contains(&opts.mount_directory_path));
 
     let (df_output, _) = command_manager::run("df -h")?;
     println!("\n\n'df -h' output:\n\n{}\n\n", df_output);
-    assert!(df_output.contains(strip_dev(&opts.block_device_name)));
+    assert!(df_output.contains(&opts.block_device_name.trim_start_matches("/dev/")));
     assert!(df_output.contains(&opts.mount_directory_path));
 
     log::info!("walking directory {}", opts.mount_directory_path);
@@ -586,14 +625,6 @@ pub fn parse_volume_lease_hold_key_value(s: &str) -> io::Result<(String, i64)> {
         )
     })?;
     Ok((ec2_instance_id, unix_ts))
-}
-
-pub fn strip_dev(s: &str) -> &str {
-    if s.len() >= 5 && &s[0..5] == "/dev/" {
-        &s[5..]
-    } else {
-        s
-    }
 }
 
 fn absolute_path(path: impl AsRef<Path>) -> io::Result<PathBuf> {
