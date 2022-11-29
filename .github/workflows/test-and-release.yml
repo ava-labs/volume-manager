@@ -179,15 +179,15 @@ jobs:
 
             cp ./target/${TARGET}/release/aws-volume-provisioner aws-volume-provisioner.${TARGET}
             echo "file_name_aws_volume_provisioner=aws-volume-provisioner.${TARGET}" >> $GITHUB_OUTPUT
-            tar -czvf aws-volume-provisioner_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
-            echo "file_name_aws_volume_provisioner_tar_gz=aws-volume-provisioner_${TARGET}.tar.gz" >> $GITHUB_OUTPUT
+            tar -czvf aws-volume-provisioner.${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
+            echo "file_name_aws_volume_provisioner_tar_gz=aws-volume-provisioner.${TARGET}.tar.gz" >> $GITHUB_OUTPUT
 
           elif [ "$PLATFORM_NAME" == "darwin" ]; then
 
             cp ./target/${TARGET}/release/aws-volume-provisioner aws-volume-provisioner.${TARGET}
             echo "file_name_aws_volume_provisioner=aws-volume-provisioner.${TARGET}" >> $GITHUB_OUTPUT
-            gtar -czvf aws-volume-provisioner_${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
-            echo "file_name_aws_volume_provisioner_tar_gz=aws-volume-provisioner_${TARGET}.tar.gz" >> $GITHUB_OUTPUT
+            gtar -czvf aws-volume-provisioner.${TARGET}.tar.gz -C ./target/${TARGET}/release aws-volume-provisioner
+            echo "file_name_aws_volume_provisioner_tar_gz=aws-volume-provisioner.${TARGET}.tar.gz" >> $GITHUB_OUTPUT
 
           else
 
