@@ -35,8 +35,10 @@ e.g.,
 $ aws-volume-provisioner \
 --log-level=info \
 --initial-wait-random-seconds=70 \
---kind-tag=aws-volume-provisioner \
---id-tag=TEST-ID \
+--id-tag-key=Id \
+--id-tag-value=TEST-ID \
+--kind-tag-key=Kind \
+--kind-tag-value=aws-volume-provisioner \
 --volume-type=gp3 \
 --volume-size=400 \
 --volume-iops=3000 \
@@ -68,16 +70,32 @@ $ aws-volume-provisioner \
                 .default_value("5"),
         )
         .arg(
-            Arg::new("KIND_TAG")
-                .long("kind-tag")
-                .help("Sets the kind tag")
+            Arg::new("ID_TAG_KEY")
+                .long("id-tag-key")
+                .help("Sets the key for the EC2 instance 'Id' tag (must be set via EC2 tags, or used for EBS volume creation)")
+                .required(true)
+                .num_args(1)
+                .default_value("Id"),
+        )
+        .arg(
+            Arg::new("ID_TAG_VALUE")
+                .long("id-tag-value")
+                .help("Sets the value for the EC2 instance 'Id' tag key (must be set via EC2 tags)")
                 .required(true)
                 .num_args(1),
         )
         .arg(
-            Arg::new("ID_TAG")
-                .long("id-tag")
-                .help("Sets the Id tag")
+            Arg::new("KIND_TAG_KEY")
+                .long("kind-tag-key")
+                .help("Sets the key for the EC2 instance 'Kind' tag (must be set via EC2 tags, or used for EBS volume creation)")
+                .required(true)
+                .num_args(1)
+                .default_value("Kind"),
+        )
+        .arg(
+            Arg::new("KIND_TAG_VALUE")
+                .long("kind-tag-value")
+                .help("Sets the value for the EC2 instance 'Kind' tag key (must be set via EC2 tags)")
                 .required(true)
                 .num_args(1),
         )
@@ -150,8 +168,10 @@ pub struct Flags {
     pub log_level: String,
     pub initial_wait_random_seconds: u32,
 
-    pub kind: String,
-    pub id: String,
+    pub id_tag_key: String,
+    pub id_tag_value: String,
+    pub kind_tag_key: String,
+    pub kind_tag_value: String,
 
     pub volume_type: String,
     pub volume_size: u32,
@@ -205,12 +225,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     }
 
     log::info!(
-        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and Id '{}' (for reuse)",
+        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and id tag value '{}' (for reuse)",
         shared_config.region(),
         az,
         opts.ebs_device_name,
         ec2_instance_id,
-        opts.id
+        opts.id_tag_value
     );
 
     // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
@@ -239,12 +259,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .set_values(Some(vec![az.clone()]))
             .build(),
         Filter::builder()
-            .set_name(Some(String::from("tag:Kind")))
-            .set_values(Some(vec![opts.kind.clone()]))
+            .set_name(Some(format!("tag:{}", opts.id_tag_key)))
+            .set_values(Some(vec![opts.id_tag_value.clone()]))
             .build(),
         Filter::builder()
-            .set_name(Some(String::from("tag:Id")))
-            .set_values(Some(vec![opts.id.clone()]))
+            .set_name(Some(format!("tag:{}", opts.kind_tag_key)))
+            .set_values(Some(vec![opts.kind_tag_value.clone()]))
             .build(),
         Filter::builder()
             .set_name(Some(String::from("volume-type")))
@@ -280,7 +300,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         log::info!("no need mkfs because the local EC2 instance already has an volume attached");
         need_mkfs = false;
     } else {
-        log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id);
+        log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id_tag_value);
 
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
         let filters: Vec<Filter> = vec![
@@ -294,12 +314,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .set_values(Some(vec![az.clone()]))
                 .build(),
             Filter::builder()
-                .set_name(Some(String::from("tag:Kind")))
-                .set_values(Some(vec![opts.kind.clone()]))
+                .set_name(Some(format!("tag:{}", opts.id_tag_key)))
+                .set_values(Some(vec![opts.id_tag_value.clone()]))
                 .build(),
             Filter::builder()
-                .set_name(Some(String::from("tag:Id")))
-                .set_values(Some(vec![opts.id.clone()]))
+                .set_name(Some(format!("tag:{}", opts.kind_tag_key)))
+                .set_values(Some(vec![opts.kind_tag_value.clone()]))
                 .build(),
             Filter::builder()
                 .set_name(Some(String::from("volume-type")))
@@ -372,7 +392,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         let unix_ts = now.timestamp();
 
         if reusable_volume_found_in_az {
-            log::info!("found reusable, available volume for AZ '{}' and Id '{}', attaching '{:?}' to the local EC2 instance", az, opts.id, volumes[0]);
+            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, volumes[0]);
 
             log::info!("updating lease holder tag key for the EBS volume...");
 
@@ -396,9 +416,9 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             need_mkfs = false;
         } else {
             log::info!(
-                "no reusable, available volume for AZ '{}' and Id '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
+                "no reusable, available volume for AZ '{}' and id tag value '{}', must create one in the AZ with size {}, IOPS {}, throughput {}",
                 az,
-                opts.id,
+                opts.id_tag_value,
                 opts.volume_size,
                 opts.volume_iops,
                 opts.volume_throughput,
@@ -420,20 +440,20 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                         .resource_type(ResourceType::Volume)
                         .tags(
                             Tag::builder()
-                                .key(String::from("Kind"))
-                                .value(opts.kind.clone())
-                                .build(),
-                        )
-                        .tags(
-                            Tag::builder()
-                                .key(String::from("Id"))
-                                .value(opts.id.clone())
-                                .build(),
-                        )
-                        .tags(
-                            Tag::builder()
                                 .key(String::from("Name"))
-                                .value(opts.id.clone())
+                                .value(opts.id_tag_value.clone())
+                                .build(),
+                        )
+                        .tags(
+                            Tag::builder()
+                                .key(opts.id_tag_key.clone())
+                                .value(opts.id_tag_value.clone())
+                                .build(),
+                        )
+                        .tags(
+                            Tag::builder()
+                                .key(opts.kind_tag_key.clone())
+                                .value(opts.kind_tag_value.clone())
                                 .build(),
                         )
                         .tags(
