@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "aws-volume-provisioner"
+    "aws-volume-provisioner",
+    "aws-volume-provisioner-installer"
 ]
