@@ -13,7 +13,7 @@ name = "aws-volume-provisioner"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = { version = "0.23.1", features = ["ec2"] } # https://crates.io/crates/aws-manager
+aws-manager = { version = "0.23.2", features = ["ec2"] } # https://crates.io/crates/aws-manager
 aws-sdk-ec2 = "0.23.0"
 chrono = "0.4.23"
 clap = { version = "4.1.1", features = ["cargo", "derive"] }
