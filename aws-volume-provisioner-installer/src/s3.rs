@@ -70,7 +70,7 @@ pub async fn download(
         fs::copy(&tmp_path, &target_bin_path)?;
         fs::remove_file(&tmp_path)?;
     } else {
-        log::info!("skipping avalanchego downloads")
+        log::info!("skipping downloads")
     }
 
     Ok(())

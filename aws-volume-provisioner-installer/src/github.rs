@@ -8,7 +8,7 @@ use std::{
 use serde::{Deserialize, Serialize};
 use tokio::time::{sleep, Duration};
 
-/// Downloads the latest "avalanchego" from the github release page.
+/// Downloads the latest from the github release page.
 pub async fn download_latest(
     arch: Option<Arch>,
     os: Option<Os>,
@@ -17,9 +17,9 @@ pub async fn download_latest(
     download(arch, os, None, target_file_path).await
 }
 
-pub const DEFAULT_TAG_NAME: &str = "v0.0.45";
+pub const DEFAULT_TAG_NAME: &str = "latest";
 
-/// Downloads the official "avalanchego" binaries from the GitHub release page.
+/// Downloads the official binaries from the GitHub release page.
 /// Returns the path to the binary path.
 ///
 /// Leave "release_tag" none to download the latest.
@@ -41,7 +41,19 @@ pub async fn download(
         log::info!("fetching the latest git tags");
         let mut release_info = ReleaseResponse::default();
         for round in 0..20 {
-            let info = fetch_latest_release("ava-labs", "volume-manager").await?;
+            let info = match crate::github::fetch_latest_release("ava-labs", "volume-manager").await
+            {
+                Ok(v) => v,
+                Err(e) => {
+                    log::warn!(
+                        "failed fetch_latest_release {} -- retrying {}...",
+                        e,
+                        round + 1
+                    );
+                    sleep(Duration::from_secs((round + 1) * 5)).await;
+                    continue;
+                }
+            };
 
             release_info = info;
             if release_info.tag_name.is_some() {
@@ -53,10 +65,8 @@ pub async fn download(
         }
 
         if release_info.tag_name.is_none() {
-            return Err(Error::new(
-                ErrorKind::Other,
-                "release_info.tag_name not found",
-            ));
+            log::warn!("release_info.tag_name not found -- defaults to {DEFAULT_TAG_NAME}");
+            release_info.tag_name = Some(DEFAULT_TAG_NAME.to_string());
         }
 
         if release_info.prerelease {
@@ -115,7 +125,7 @@ pub async fn download(
         ));
     }
 
-    log::info!("downloading latest avalanchego '{}'", file_name);
+    log::info!("downloading latest '{}'", file_name);
     let download_url = format!(
         "https://github.com/ava-labs/volume-manager/releases/download/{}/{}",
         tag_name, file_name
@@ -192,7 +202,7 @@ pub struct Asset {
     pub browser_download_url: String,
 }
 
-/// Represents the AvalancheGo release "arch".
+/// Represents the release "arch".
 #[derive(Eq, PartialEq, Clone)]
 pub enum Arch {
     Amd64,
@@ -224,7 +234,7 @@ impl Arch {
     }
 }
 
-/// Represents the AvalancheGo release "os".
+/// Represents the release "os".
 #[derive(Eq, PartialEq, Clone)]
 pub enum Os {
     MacOs,
