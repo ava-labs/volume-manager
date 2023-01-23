@@ -1,8 +1,4 @@
-use std::{
-    env, fs,
-    io::{self, Write},
-    sync::Arc,
-};
+use std::{fs, io, sync::Arc};
 
 use aws_manager::{self, s3};
 use aws_volume_provisioner_installer::{github, s3 as s3_installer};
