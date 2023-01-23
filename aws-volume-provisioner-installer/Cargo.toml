@@ -5,7 +5,7 @@ edition = "2021"
 rust-version = "1.66"
 publish = true
 description = "aws-volume-provisioner installer"
-repository = "https://github.com/ava-labs/aws-volume-provisioner-installer"
+repository = "https://github.com/ava-labs/volume-manager"
 readme = "README.md"
 license = "Apache-2.0"
 
