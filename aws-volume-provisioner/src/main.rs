@@ -22,6 +22,8 @@ async fn main() -> io::Result<()> {
     let id_tag_value = matches.get_one::<String>("ID_TAG_VALUE").unwrap().clone();
     let kind_tag_key = matches.get_one::<String>("KIND_TAG_KEY").unwrap().clone();
     let kind_tag_value = matches.get_one::<String>("KIND_TAG_VALUE").unwrap().clone();
+    let asg_tag_key = matches.get_one::<String>("ASG_TAG_KEY").unwrap().clone();
+    let asg_tag_value = matches.get_one::<String>("ASG_TAG_VALUE").unwrap().clone();
 
     let volume_type = matches
         .get_one::<String>("VOLUME_TYPE")
@@ -70,6 +72,8 @@ async fn main() -> io::Result<()> {
         id_tag_value,
         kind_tag_key,
         kind_tag_value,
+        asg_tag_key,
+        asg_tag_value,
         volume_type,
         volume_size,
         volume_iops,

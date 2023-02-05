@@ -39,6 +39,8 @@ $ aws-volume-provisioner \
 --id-tag-value=TEST-ID \
 --kind-tag-key=Kind \
 --kind-tag-value=aws-volume-provisioner \
+--asg-tag-key=aws:autoscaling:groupName \
+--asg-tag-value=dev-machine-202301-HsvtyG-amd64-1 \
 --volume-type=gp3 \
 --volume-size=400 \
 --volume-iops=3000 \
@@ -72,7 +74,7 @@ $ aws-volume-provisioner \
         .arg(
             Arg::new("ID_TAG_KEY")
                 .long("id-tag-key")
-                .help("Sets the key for the EC2 instance 'Id' tag (must be set via EC2 tags, or used for EBS volume creation)")
+                .help("Sets the key for the EBS volume 'Id' tag (must be set via EC2 tags, or used for EBS volume creation)")
                 .required(true)
                 .num_args(1)
                 .default_value("Id"),
@@ -80,14 +82,14 @@ $ aws-volume-provisioner \
         .arg(
             Arg::new("ID_TAG_VALUE")
                 .long("id-tag-value")
-                .help("Sets the value for the EC2 instance 'Id' tag key (must be set via EC2 tags)")
+                .help("Sets the value for the EBS volume 'Id' tag key (must be set via EC2 tags)")
                 .required(true)
                 .num_args(1),
         )
         .arg(
             Arg::new("KIND_TAG_KEY")
                 .long("kind-tag-key")
-                .help("Sets the key for the EC2 instance 'Kind' tag (must be set via EC2 tags, or used for EBS volume creation)")
+                .help("Sets the key for the EBS volume 'Kind' tag (must be set via EC2 tags, or used for EBS volume creation)")
                 .required(true)
                 .num_args(1)
                 .default_value("Kind"),
@@ -95,7 +97,22 @@ $ aws-volume-provisioner \
         .arg(
             Arg::new("KIND_TAG_VALUE")
                 .long("kind-tag-value")
-                .help("Sets the value for the EC2 instance 'Kind' tag key (must be set via EC2 tags)")
+                .help("Sets the value for the EBS volume 'Kind' tag key (must be set via EC2 tags)")
+                .required(true)
+                .num_args(1),
+        )
+        .arg(
+            Arg::new("ASG_TAG_KEY")
+                .long("asg-tag-key")
+                .help("Sets the key for the EBS volume asg name tag (must be set via EC2 tags, or used for EBS volume creation)")
+                .required(true)
+                .num_args(1)
+                .default_value("aws:autoscaling:groupName"),
+        )
+        .arg(
+            Arg::new("ASG_TAG_VALUE")
+                .long("asg-tag-value")
+                .help("Sets the value for the EBS volume asg name tag key (must be set via EC2 tags)")
                 .required(true)
                 .num_args(1),
         )
@@ -172,6 +189,8 @@ pub struct Flags {
     pub id_tag_value: String,
     pub kind_tag_key: String,
     pub kind_tag_value: String,
+    pub asg_tag_key: String,
+    pub asg_tag_value: String,
 
     pub volume_type: String,
     pub volume_size: u32,
@@ -225,12 +244,13 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     }
 
     log::info!(
-        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', and id tag value '{}' (for reuse)",
+        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', id tag value '{}', asg tag value '{}' (for reuse)",
         shared_config.region(),
         az,
         opts.ebs_device_name,
         ec2_instance_id,
-        opts.id_tag_value
+        opts.id_tag_value,
+        opts.asg_tag_value
     );
 
     // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
@@ -265,6 +285,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         Filter::builder()
             .set_name(Some(format!("tag:{}", opts.kind_tag_key)))
             .set_values(Some(vec![opts.kind_tag_value.clone()]))
+            .build(),
+        Filter::builder()
+            .set_name(Some(format!("tag:{}", opts.asg_tag_key)))
+            .set_values(Some(vec![opts.asg_tag_value.clone()]))
             .build(),
         Filter::builder()
             .set_name(Some(String::from("volume-type")))
@@ -302,7 +326,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     } else {
         log::info!("local EC2 instance '{}' has no attached volume, querying available volumes by AZ '{}' and Id '{}'", ec2_instance_id, az, opts.id_tag_value);
 
-        // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
+        // ref. <https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html>
         let filters: Vec<Filter> = vec![
             // ensures the call only returns the volume that is currently available
             Filter::builder()
@@ -320,6 +344,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             Filter::builder()
                 .set_name(Some(format!("tag:{}", opts.kind_tag_key)))
                 .set_values(Some(vec![opts.kind_tag_value.clone()]))
+                .build(),
+            Filter::builder()
+                .set_name(Some(format!("tag:{}", opts.asg_tag_key)))
+                .set_values(Some(vec![opts.asg_tag_value.clone()]))
                 .build(),
             Filter::builder()
                 .set_name(Some(String::from("volume-type")))
@@ -454,6 +482,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                             Tag::builder()
                                 .key(opts.kind_tag_key.clone())
                                 .value(opts.kind_tag_value.clone())
+                                .build(),
+                        )
+                        .tags(
+                            Tag::builder()
+                                .key(opts.asg_tag_key.clone())
+                                .value(opts.asg_tag_value.clone())
                                 .build(),
                         )
                         .tags(
