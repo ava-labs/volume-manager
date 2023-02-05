@@ -39,7 +39,7 @@ $ aws-volume-provisioner \
 --id-tag-value=TEST-ID \
 --kind-tag-key=Kind \
 --kind-tag-value=aws-volume-provisioner \
---asg-tag-key=aws:autoscaling:groupName \
+--asg-tag-key=autoscaling:groupName \
 --asg-tag-value=dev-machine-202301-HsvtyG-amd64-1 \
 --volume-type=gp3 \
 --volume-size=400 \
@@ -107,7 +107,7 @@ $ aws-volume-provisioner \
                 .help("Sets the key for the EBS volume asg name tag (must be set via EC2 tags, or used for EBS volume creation)")
                 .required(true)
                 .num_args(1)
-                .default_value("aws:autoscaling:groupName"),
+                .default_value("autoscaling:groupName"),
         )
         .arg(
             Arg::new("ASG_TAG_VALUE")
