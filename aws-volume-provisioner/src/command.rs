@@ -494,7 +494,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                         .tags(
                             Tag::builder()
                                 .key(String::from("Name"))
-                                .value(opts.id_tag_value.clone())
+                                .value(asg_tag_value.clone())
                                 .build(),
                         )
                         .tags(
