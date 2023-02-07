@@ -2,6 +2,7 @@ use std::{
     env, fs,
     io::{self, Error, ErrorKind},
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 use aws_manager::{self, ec2};
@@ -39,8 +40,8 @@ $ aws-volume-provisioner \
 --id-tag-value=TEST-ID \
 --kind-tag-key=Kind \
 --kind-tag-value=aws-volume-provisioner \
+--ec2-tag-asg-name-key=ASG_NAME \
 --asg-tag-key=autoscaling:groupName \
---asg-tag-value=dev-machine-202301-HsvtyG-amd64-1 \
 --volume-type=gp3 \
 --volume-size=400 \
 --volume-iops=3000 \
@@ -102,19 +103,19 @@ $ aws-volume-provisioner \
                 .num_args(1),
         )
         .arg(
+            Arg::new("EC2_TAG_ASG_NAME_KEY")
+                .long("ec2-tag-asg-name-key")
+                .help("Sets the key of the ASG name tag")
+                .required(true)
+                .num_args(1),
+        )
+        .arg(
             Arg::new("ASG_TAG_KEY")
                 .long("asg-tag-key")
                 .help("Sets the key for the EBS volume asg name tag (must be set via EC2 tags, or used for EBS volume creation)")
                 .required(true)
                 .num_args(1)
                 .default_value("autoscaling:groupName"),
-        )
-        .arg(
-            Arg::new("ASG_TAG_VALUE")
-                .long("asg-tag-value")
-                .help("Sets the value for the EBS volume asg name tag key (must be set via EC2 tags)")
-                .required(true)
-                .num_args(1),
         )
         .arg(
             Arg::new("VOLUME_TYPE")
@@ -189,8 +190,8 @@ pub struct Flags {
     pub id_tag_value: String,
     pub kind_tag_key: String,
     pub kind_tag_value: String,
+    pub ec2_tag_asg_name_key: String,
     pub asg_tag_key: String,
-    pub asg_tag_value: String,
 
     pub volume_type: String,
     pub volume_size: u32,
@@ -230,6 +231,31 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             format!("failed fetch_instance_id '{}'", e),
         )
     })?;
+    let ec2_instance_id_arc = Arc::new(ec2_instance_id.clone());
+
+    log::info!("fetching the tag value for {}", opts.ec2_tag_asg_name_key);
+    let tags = ec2_manager
+        .fetch_tags(ec2_instance_id_arc)
+        .await
+        .map_err(|e| Error::new(ErrorKind::Other, format!("failed fetch_tags {}", e)))?;
+
+    let mut asg_tag_value = String::new();
+    for c in tags {
+        let k = c.key().unwrap();
+        let v = c.value().unwrap();
+
+        log::info!("EC2 tag key='{}', value='{}'", k, v);
+        if k == opts.ec2_tag_asg_name_key {
+            asg_tag_value = v.to_string();
+            break;
+        }
+    }
+    if asg_tag_value.is_empty() {
+        return Err(Error::new(
+            ErrorKind::Other,
+            format!("{} is empty", opts.ec2_tag_asg_name_key),
+        ));
+    }
 
     let sleep_sec = if opts.initial_wait_random_seconds > 0 {
         random_manager::u32() % opts.initial_wait_random_seconds
@@ -244,13 +270,12 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     }
 
     log::info!(
-        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', id tag value '{}', asg tag value '{}' (for reuse)",
+        "checking if the local instance has an already attached volume with region '{:?}', AZ '{}', device '{}', instance Id '{}', id tag value '{}' (for reuse)",
         shared_config.region(),
         az,
         opts.ebs_device_name,
         ec2_instance_id,
         opts.id_tag_value,
-        opts.asg_tag_value
     );
 
     // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_DescribeVolumes.html
@@ -288,7 +313,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .build(),
         Filter::builder()
             .set_name(Some(format!("tag:{}", opts.asg_tag_key)))
-            .set_values(Some(vec![opts.asg_tag_value.clone()]))
+            .set_values(Some(vec![asg_tag_value.clone()]))
             .build(),
         Filter::builder()
             .set_name(Some(String::from("volume-type")))
@@ -347,7 +372,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .build(),
             Filter::builder()
                 .set_name(Some(format!("tag:{}", opts.asg_tag_key)))
-                .set_values(Some(vec![opts.asg_tag_value.clone()]))
+                .set_values(Some(vec![asg_tag_value.clone()]))
                 .build(),
             Filter::builder()
                 .set_name(Some(String::from("volume-type")))
@@ -487,7 +512,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                         .tags(
                             Tag::builder()
                                 .key(opts.asg_tag_key.clone())
-                                .value(opts.asg_tag_value.clone())
+                                .value(asg_tag_value.clone())
                                 .build(),
                         )
                         .tags(
