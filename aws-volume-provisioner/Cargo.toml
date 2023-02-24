@@ -20,7 +20,7 @@ clap = { version = "4.1.6", features = ["cargo", "derive"] }
 command-manager = "0.0.1"
 env_logger = "0.10.0"
 log = "0.4.17"
-path-clean = "0.1.0"
+path-clean = "1.0.1"
 random-manager = "0.0.5"
 tokio = { version = "1.25.0", features = ["full"] }
 walkdir = "2.3.2"
