@@ -2,7 +2,6 @@ use std::{
     env, fs,
     io::{self, Error, ErrorKind},
     path::{Path, PathBuf},
-    sync::Arc,
 };
 
 use aws_manager::{self, ec2};
@@ -215,7 +214,6 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     let shared_config = aws_manager::load_config(None).await?;
     let ec2_manager = ec2::Manager::new(&shared_config);
-    let ec2_cli = ec2_manager.client();
 
     let az = ec2::metadata::fetch_availability_zone()
         .await
@@ -231,11 +229,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             format!("failed fetch_instance_id '{}'", e),
         )
     })?;
-    let ec2_instance_id_arc = Arc::new(ec2_instance_id.clone());
 
     log::info!("fetching the tag value for {}", opts.ec2_tag_asg_name_key);
     let tags = ec2_manager
-        .fetch_tags(ec2_instance_id_arc)
+        .fetch_tags(&ec2_instance_id)
         .await
         .map_err(|e| Error::new(ErrorKind::Other, format!("failed fetch_tags {}", e)))?;
 
@@ -451,7 +448,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
             // ref. https://docs.aws.amazon.com/cli/latest/reference/ec2/create-tags.html
             ec2_manager
-                .client()
+                .cli
                 .create_tags()
                 .resources(volumes[0].volume_id().unwrap())
                 .tags(
@@ -480,7 +477,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             log::info!("sending 'create_volume' request with tags");
 
             // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_CreateVolume.html
-            let resp = ec2_cli
+            let resp = ec2_manager
+                .cli
                 .create_volume()
                 .availability_zone(az)
                 .volume_type(VolumeType::from(opts.volume_type.as_str()))
@@ -528,7 +526,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .map_err(|e| {
                     Error::new(
                         ErrorKind::Other,
-                        format!("failed ec2_cli.create_volume {}", e),
+                        format!("failed ec2_manager.cli.create_volume {}", e),
                     )
                 })?;
             let volume_id = resp.volume_id().unwrap();
@@ -563,7 +561,8 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         log::info!("attaching the volume {} to the local instance", volume_id);
 
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_AttachVolume.html
-        ec2_cli
+        ec2_manager
+            .cli
             .attach_volume()
             .device(opts.ebs_device_name.clone())
             .volume_id(volume_id)
@@ -573,7 +572,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .map_err(|e| {
                 Error::new(
                     ErrorKind::Other,
-                    format!("failed ec2_cli.attach_volume {}", e),
+                    format!("failed ec2_manager.cli.attach_volume {}", e),
                 )
             })?;
     }
