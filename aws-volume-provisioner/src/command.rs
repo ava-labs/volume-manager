@@ -212,7 +212,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     );
     log::info!("starting 'aws-volume-provisioner'");
 
-    let shared_config = aws_manager::load_config(None).await?;
+    let shared_config = aws_manager::load_config(None, Some(Duration::from_secs(30))).await?;
     let ec2_manager = ec2::Manager::new(&shared_config);
 
     let az = ec2::metadata::fetch_availability_zone()
