@@ -1,6 +1,6 @@
 [package]
 name = "aws-volume-provisioner"
-version = "0.0.82" # https://github.com/ava-labs/volume-manager/releases
+version = "0.0.83" # https://github.com/ava-labs/volume-manager/releases
 edition = "2021"
 rust-version = "1.68"
 description = "AWS volume provisioner"
@@ -13,8 +13,8 @@ name = "aws-volume-provisioner"
 path = "src/main.rs"
 
 [dependencies]
-aws-manager = { version = "0.25.5", features = ["ec2"] } # https://crates.io/crates/aws-manager
-aws-sdk-ec2 = "0.25.1"
+aws-manager = { version = "0.26.0", features = ["ec2"] } # https://crates.io/crates/aws-manager
+aws-sdk-ec2 = "0.26.0"
 chrono = "0.4.24"
 clap = { version = "4.2.1", features = ["cargo", "derive"] }
 command-manager = "0.0.1"

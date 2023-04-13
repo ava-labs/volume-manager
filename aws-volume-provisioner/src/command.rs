@@ -326,7 +326,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 format!(
                     "failed ec2_manager.describe_volumes {} (retryable {})",
                     e.message(),
-                    e.is_retryable()
+                    e.retryable()
                 ),
             )
         })?;
@@ -385,7 +385,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                     format!(
                         "failed ec2_manager.describe_volumes {} (retryable {})",
                         e.message(),
-                        e.is_retryable()
+                        e.retryable()
                     ),
                 )
             })?;
@@ -548,7 +548,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                         format!(
                             "failed ec2_manager.poll_volume_state {} (retryable {})",
                             e.message(),
-                            e.is_retryable()
+                            e.retryable()
                         ),
                     )
                 })?;
@@ -595,7 +595,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 format!(
                     "failed ec2_manager.poll_local_volume_by_attachment_state {} (retryable {})",
                     e.message(),
-                    e.is_retryable()
+                    e.retryable()
                 ),
             )
         })?;
