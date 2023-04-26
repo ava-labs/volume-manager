@@ -63,6 +63,14 @@ $ aws-volume-provisioner \
                 .default_value("info"),
         )
         .arg(
+            Arg::new("REGION")
+                .long("region")
+                .help("Sets the AWS region")
+                .required(true)
+                .num_args(1)
+                .default_value("us-west-2"),
+        )
+        .arg(
             Arg::new("INITIAL_WAIT_RANDOM_SECONDS")
                 .long("initial-wait-random-seconds")
                 .help("Sets the maximum number of seconds to wait (value chosen at random with the range)")
@@ -183,6 +191,7 @@ $ aws-volume-provisioner \
 /// Defines flag options.
 pub struct Flags {
     pub log_level: String,
+    pub region: String,
     pub initial_wait_random_seconds: u32,
 
     pub id_tag_key: String,
@@ -210,9 +219,13 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     env_logger::init_from_env(
         env_logger::Env::default().filter_or(env_logger::DEFAULT_FILTER_ENV, opts.log_level),
     );
-    log::info!("starting 'aws-volume-provisioner'");
+    log::info!(
+        "starting 'aws-volume-provisioner' on the region '{}'",
+        opts.region
+    );
 
-    let shared_config = aws_manager::load_config(None, Some(Duration::from_secs(30))).await;
+    let shared_config =
+        aws_manager::load_config(Some(opts.region.clone()), Some(Duration::from_secs(30))).await;
     let ec2_manager = ec2::Manager::new(&shared_config);
 
     let az = ec2::metadata::fetch_availability_zone()
