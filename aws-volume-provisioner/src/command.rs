@@ -6,7 +6,8 @@ use std::{
 
 use aws_manager::{self, ec2};
 use aws_sdk_ec2::types::{
-    Filter, ResourceType, Tag, TagSpecification, VolumeAttachmentState, VolumeState, VolumeType,
+    Filter, ResourceType, Tag, TagSpecification, Volume, VolumeAttachmentState, VolumeState,
+    VolumeType,
 };
 use chrono::{DateTime, Utc};
 use clap::{crate_version, value_parser, Arg, Command};
@@ -330,7 +331,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .set_values(Some(vec![opts.volume_type.clone()]))
             .build(),
     ];
-    let volumes = ec2_manager
+    let local_volumes = ec2_manager
         .describe_volumes(Some(filters))
         .await
         .map_err(|e| {
@@ -346,7 +347,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
 
     log::info!(
         "found {} attached volume for the local EC2 instance",
-        volumes.len()
+        local_volumes.len()
     );
 
     // only make filesystem (format) for initial creation
@@ -354,7 +355,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     // do not format volume for reused EBS volumes
     let mut need_mkfs = true;
 
-    let local_attached_volume_found = volumes.len() == 1;
+    let local_attached_volume_found = local_volumes.len() == 1;
     if local_attached_volume_found {
         log::info!("no need mkfs because the local EC2 instance already has an volume attached");
         need_mkfs = false;
@@ -389,27 +390,41 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .set_values(Some(vec![opts.volume_type.clone()]))
                 .build(),
         ];
-        let mut volumes = ec2_manager
-            .describe_volumes(Some(filters))
-            .await
-            .map_err(|e| {
-                Error::new(
-                    ErrorKind::Other,
-                    format!(
-                        "failed ec2_manager.describe_volumes {} (retryable {})",
-                        e.message(),
-                        e.retryable()
-                    ),
-                )
-            })?;
 
-        let mut reusable_volume_found_in_az = !volumes.is_empty();
+        // NOTE: sometimes EBS returns zero volume even if there's a volume
+        // with matching tags... retry just in case...
+        let mut described_or_created_volumes: Vec<Volume> = Vec::new();
+        for i in 0..10 {
+            log::info!("[{i}] trying describe_volumes to find reusable volumes");
+            described_or_created_volumes = ec2_manager
+                .describe_volumes(Some(filters.clone()))
+                .await
+                .map_err(|e| {
+                    Error::new(
+                        ErrorKind::Other,
+                        format!(
+                            "failed ec2_manager.describe_volumes {} (retryable {})",
+                            e.message(),
+                            e.retryable()
+                        ),
+                    )
+                })?;
+
+            if described_or_created_volumes.len() > 0 {
+                break;
+            }
+
+            log::info!("no volume found... retrying in case of inconsistent EBS describe_volumes API response");
+            sleep(Duration::from_secs(3)).await;
+        }
+
+        let mut reusable_volume_found_in_az = !local_volumes.is_empty();
 
         // if we don't check whether the other instance in the same AZ has "just" created
         // this EBS volume or not, this can be racey -- two instances may be trying to attach
         // the same EBS volume to two different instances at the same time
         if reusable_volume_found_in_az {
-            if let Some(tags) = volumes[0].tags() {
+            if let Some(tags) = local_volumes[0].tags() {
                 for tag in tags.iter() {
                     if let Some(tag_key) = tag.key() {
                         if !tag_key.eq(VOLUME_LEASE_HOLD_KEY) {
@@ -455,7 +470,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         let unix_ts = now.timestamp();
 
         if reusable_volume_found_in_az {
-            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, volumes[0]);
+            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, local_volumes[0]);
 
             log::info!("updating lease holder tag key for the EBS volume...");
 
@@ -463,7 +478,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             ec2_manager
                 .cli
                 .create_tags()
-                .resources(volumes[0].volume_id().unwrap())
+                .resources(local_volumes[0].volume_id().unwrap())
                 .tags(
                     Tag::builder()
                         .key(VOLUME_LEASE_HOLD_KEY.to_string())
@@ -567,10 +582,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 })?;
             log::info!("polled volume after create: {:?}", volume);
 
-            volumes.push(volume.unwrap());
+            described_or_created_volumes.push(volume.unwrap());
         };
 
-        let volume_id = volumes[0].volume_id().unwrap();
+        let volume_id = described_or_created_volumes[0].volume_id().unwrap();
         log::info!("attaching the volume {} to the local instance", volume_id);
 
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_AttachVolume.html
