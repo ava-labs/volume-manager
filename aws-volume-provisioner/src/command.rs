@@ -342,23 +342,24 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             .set_values(Some(vec![opts.volume_type.clone()]))
             .build(),
     ];
-    let local_volumes = ec2_manager
-        .describe_volumes(Some(filters))
-        .await
-        .map_err(|e| {
-            Error::new(
-                ErrorKind::Other,
-                format!(
-                    "failed ec2_manager.describe_volumes {} (retryable {})",
-                    e.message(),
-                    e.retryable()
-                ),
-            )
-        })?;
+    let local_attached_volumes =
+        ec2_manager
+            .describe_volumes(Some(filters))
+            .await
+            .map_err(|e| {
+                Error::new(
+                    ErrorKind::Other,
+                    format!(
+                        "failed ec2_manager.describe_volumes {} (retryable {})",
+                        e.message(),
+                        e.retryable()
+                    ),
+                )
+            })?;
 
     log::info!(
-        "found {} attached volume for the local EC2 instance",
-        local_volumes.len()
+        "found {} local attached volume for the local EC2 instance",
+        local_attached_volumes.len()
     );
 
     // only make filesystem (format) for initial creation
@@ -366,7 +367,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     // do not format volume for reused EBS volumes
     let mut need_mkfs = true;
 
-    let local_attached_volume_found = local_volumes.len() == 1;
+    let local_attached_volume_found = local_attached_volumes.len() == 1;
     if local_attached_volume_found {
         log::info!("no need mkfs because the local EC2 instance already has an volume attached");
         need_mkfs = false;
@@ -421,6 +422,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                     )
                 })?;
 
+            log::info!(
+                "described_or_created_volumes {}",
+                described_or_created_volumes.len()
+            );
             if described_or_created_volumes.len() > 0 {
                 break;
             }
@@ -429,13 +434,13 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             sleep(Duration::from_secs(3)).await;
         }
 
-        let mut reusable_volume_found_in_az = !local_volumes.is_empty();
+        let mut reusable_volume_found_in_az = !described_or_created_volumes.is_empty();
 
         // if we don't check whether the other instance in the same AZ has "just" created
         // this EBS volume or not, this can be racey -- two instances may be trying to attach
         // the same EBS volume to two different instances at the same time
         if reusable_volume_found_in_az {
-            if let Some(tags) = local_volumes[0].tags() {
+            if let Some(tags) = described_or_created_volumes[0].tags() {
                 for tag in tags.iter() {
                     if let Some(tag_key) = tag.key() {
                         if !tag_key.eq(VOLUME_LEASE_HOLD_KEY) {
@@ -481,7 +486,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         let unix_ts = now.timestamp();
 
         if reusable_volume_found_in_az {
-            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, local_volumes[0]);
+            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, described_or_created_volumes[0]);
 
             log::info!("updating lease holder tag key for the EBS volume...");
 
@@ -489,7 +494,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             ec2_manager
                 .cli
                 .create_tags()
-                .resources(local_volumes[0].volume_id().unwrap())
+                .resources(described_or_created_volumes[0].volume_id().unwrap())
                 .tags(
                     Tag::builder()
                         .key(VOLUME_LEASE_HOLD_KEY.to_string())
