@@ -126,6 +126,15 @@ $ aws-volume-provisioner \
                 .default_value("autoscaling:groupName"),
         )
         .arg(
+            Arg::new("DESCRIBE_LOCAL_RETRIES")
+                .long("describe-local-retries")
+                .help("Sets the number of describe call retries until it finds one before creating one")
+                .required(false)
+                .value_parser(value_parser!(usize))
+                .num_args(1)
+                .default_value("15"),
+        )
+        .arg(
             Arg::new("VOLUME_TYPE")
                 .long("volume-type")
                 .help("Sets the volume size in GB")
@@ -201,6 +210,8 @@ pub struct Flags {
     pub kind_tag_value: String,
     pub ec2_tag_asg_name_key: String,
     pub asg_tag_key: String,
+
+    pub describe_local_retries: usize,
 
     pub volume_type: String,
     pub volume_size: u32,
@@ -394,7 +405,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         // NOTE: sometimes EBS returns zero volume even if there's a volume
         // with matching tags... retry just in case...
         let mut described_or_created_volumes: Vec<Volume> = Vec::new();
-        for i in 0..10 {
+        for i in 0..opts.describe_local_retries {
             log::info!("[{i}] trying describe_volumes to find reusable volumes");
             described_or_created_volumes = ec2_manager
                 .describe_volumes(Some(filters.clone()))
@@ -414,7 +425,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 break;
             }
 
-            log::info!("no volume found... retrying in case of inconsistent EBS describe_volumes API response");
+            log::info!("no volume found... retrying in case of inconsistent/stale EBS describe_volumes API response");
             sleep(Duration::from_secs(3)).await;
         }
 

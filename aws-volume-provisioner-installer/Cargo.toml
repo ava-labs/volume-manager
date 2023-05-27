@@ -1,6 +1,6 @@
 [package]
 name = "aws-volume-provisioner-installer"
-version = "0.0.110" # https://github.com/ava-labs/volume-manager/releases
+version = "0.0.111" # https://github.com/ava-labs/volume-manager/releases
 edition = "2021"
 rust-version = "1.69"
 publish = true
