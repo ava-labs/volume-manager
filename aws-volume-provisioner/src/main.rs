@@ -28,8 +28,8 @@ async fn main() -> io::Result<()> {
         .clone();
     let asg_tag_key = matches.get_one::<String>("ASG_TAG_KEY").unwrap().clone();
 
-    let describe_local_retries = matches
-        .get_one::<usize>("DESCRIBE_LOCAL_RETRIES")
+    let find_reusable_retries = matches
+        .get_one::<usize>("FIND_REUSABLE_RETRIES")
         .unwrap_or(&15)
         .clone();
 
@@ -83,7 +83,7 @@ async fn main() -> io::Result<()> {
         kind_tag_value,
         ec2_tag_asg_name_key,
         asg_tag_key,
-        describe_local_retries,
+        find_reusable_retries,
         volume_type,
         volume_size,
         volume_iops,

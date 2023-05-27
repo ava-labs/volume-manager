@@ -126,7 +126,7 @@ $ aws-volume-provisioner \
                 .default_value("autoscaling:groupName"),
         )
         .arg(
-            Arg::new("DESCRIBE_LOCAL_RETRIES")
+            Arg::new("FIND_REUSABLE_RETRIES")
                 .long("describe-local-retries")
                 .help("Sets the number of describe call retries until it finds one before creating one")
                 .required(false)
@@ -211,7 +211,7 @@ pub struct Flags {
     pub ec2_tag_asg_name_key: String,
     pub asg_tag_key: String,
 
-    pub describe_local_retries: usize,
+    pub find_reusable_retries: usize,
 
     pub volume_type: String,
     pub volume_size: u32,
@@ -406,7 +406,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         // NOTE: sometimes EBS returns zero volume even if there's a volume
         // with matching tags... retry just in case...
         let mut described_or_created_volumes: Vec<Volume> = Vec::new();
-        for i in 0..opts.describe_local_retries {
+        for i in 0..opts.find_reusable_retries {
             log::info!("[{i}] trying describe_volumes to find reusable volumes");
             described_or_created_volumes = ec2_manager
                 .describe_volumes(Some(filters.clone()))
