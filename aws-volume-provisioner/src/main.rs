@@ -30,7 +30,7 @@ async fn main() -> io::Result<()> {
 
     let find_reusable_retries = matches
         .get_one::<usize>("FIND_REUSABLE_RETRIES")
-        .unwrap_or(&15)
+        .unwrap_or(&10)
         .clone();
 
     let volume_type = matches

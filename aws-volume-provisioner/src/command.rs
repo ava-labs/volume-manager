@@ -127,12 +127,12 @@ $ aws-volume-provisioner \
         )
         .arg(
             Arg::new("FIND_REUSABLE_RETRIES")
-                .long("describe-local-retries")
+                .long("find-reusable-retries")
                 .help("Sets the number of describe call retries until it finds one before creating one")
                 .required(false)
                 .value_parser(value_parser!(usize))
                 .num_args(1)
-                .default_value("15"),
+                .default_value("10"),
         )
         .arg(
             Arg::new("VOLUME_TYPE")
