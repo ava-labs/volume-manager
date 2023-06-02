@@ -660,10 +660,10 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     sleep(Duration::from_secs(5)).await;
 
     // check before mount
-    let (blk_lists, _) = command_manager::run("lsblk")?;
-    println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
-    let (df_output, _) = command_manager::run("df -h")?;
-    println!("\n\n'df -h' output:\n\n{}\n\n", df_output);
+    let blk_lists = command_manager::run("lsblk")?;
+    println!("\n\n'lsblk' output:\n\n{}\n", blk_lists.stdout);
+    let df_output = command_manager::run("df -h")?;
+    println!("\n\n'df -h' output:\n\n{}\n\n", df_output.stdout);
 
     ec2::disk::mount_filesystem(
         &opts.filesystem_name,
@@ -681,15 +681,19 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
     command_manager::run("sudo mount --all")?;
 
     // check after mount
-    let (blk_lists, _) = command_manager::run("lsblk")?;
-    println!("\n\n'lsblk' output:\n\n{}\n", blk_lists);
-    assert!(blk_lists.contains(&opts.block_device_name.trim_start_matches("/dev/")));
-    assert!(blk_lists.contains(&opts.mount_directory_path));
+    let blk_lists = command_manager::run("lsblk")?;
+    println!("\n\n'lsblk' output:\n\n{}\n", blk_lists.stdout);
+    assert!(blk_lists
+        .stdout
+        .contains(&opts.block_device_name.trim_start_matches("/dev/")));
+    assert!(blk_lists.stdout.contains(&opts.mount_directory_path));
 
-    let (df_output, _) = command_manager::run("df -h")?;
-    println!("\n\n'df -h' output:\n\n{}\n\n", df_output);
-    assert!(df_output.contains(&opts.block_device_name.trim_start_matches("/dev/")));
-    assert!(df_output.contains(&opts.mount_directory_path));
+    let df_output = command_manager::run("df -h")?;
+    println!("\n\n'df -h' output:\n\n{}\n\n", df_output.stdout);
+    assert!(df_output
+        .stdout
+        .contains(&opts.block_device_name.trim_start_matches("/dev/")));
+    assert!(df_output.stdout.contains(&opts.mount_directory_path));
 
     log::info!("walking directory {}", opts.mount_directory_path);
     let mut cnt = 0;
