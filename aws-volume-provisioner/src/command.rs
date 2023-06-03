@@ -1,6 +1,7 @@
 use std::{
-    env, fs,
-    io::{self, Error, ErrorKind},
+    env,
+    fs::{self, File},
+    io::{self, Error, ErrorKind, Write},
     path::{Path, PathBuf},
 };
 
@@ -192,9 +193,18 @@ $ aws-volume-provisioner \
         .arg(
             Arg::new("MOUNT_DIRECTORY_PATH")
                 .long("mount-directory-path")
-                .help("Sets the directory path to mount onto the device")
-                .required(true)
-                .num_args(1),
+                .help("Sets the directory path to mount onto the device (e.g., /data)")
+                .required(false)
+                .num_args(1)
+                .default_value("/data"),
+        )
+        .arg(
+            Arg::new("CURRENT_EBS_VOLUME_ID_FILE_PATH")
+                .long("current-ebs-volume-id-file-path")
+                .help("Sets the file path to write the current EBS volume ID (useful for paused instances)")
+                .required(false)
+                .num_args(1)
+                .default_value("/data/current_ebs_volume_id"),
         )
 }
 
@@ -222,6 +232,7 @@ pub struct Flags {
     pub block_device_name: String,
     pub filesystem_name: String,
     pub mount_directory_path: String,
+    pub current_ebs_volume_id_file_path: String,
 }
 
 pub async fn execute(opts: Flags) -> io::Result<()> {
@@ -492,15 +503,15 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         let unix_ts = now.timestamp();
 
         if reusable_volume_found_in_az {
-            log::info!("found reusable, available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, described_or_created_volumes[0]);
-
+            let volume_id = described_or_created_volumes[0].volume_id().unwrap();
+            log::info!("found reusable volume '{volume_id}', available volume for AZ '{}' and id tag value '{}', attaching '{:?}' to the local EC2 instance", az, opts.id_tag_value, described_or_created_volumes[0]);
             log::info!("updating lease holder tag key for the EBS volume...");
 
             // ref. https://docs.aws.amazon.com/cli/latest/reference/ec2/create-tags.html
             ec2_manager
                 .cli
                 .create_tags()
-                .resources(described_or_created_volumes[0].volume_id().unwrap())
+                .resources(volume_id)
                 .tags(
                     Tag::builder()
                         .key(VOLUME_LEASE_HOLD_KEY.to_string())
@@ -512,7 +523,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 .map_err(|e| Error::new(ErrorKind::Other, format!("failed create_tags '{}'", e)))?;
 
             // do not "mkfs" to retain the previous state
-            log::info!("no need mkfs because we are attaching the existing available volume to the local EC2 instance, and retain previous state");
+            log::info!("no need mkfs because we are attaching the existing available volume '{volume_id}' to the local EC2 instance, and retain previous state");
             need_mkfs = false;
         } else {
             log::info!(
@@ -608,8 +619,7 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
         };
 
         let volume_id = described_or_created_volumes[0].volume_id().unwrap();
-        log::info!("attaching the volume {} to the local instance", volume_id);
-
+        log::info!("attaching the volume '{volume_id}' to the local instance");
         // ref. https://docs.aws.amazon.com/AWSEC2/latest/APIReference/API_AttachVolume.html
         ec2_manager
             .cli
@@ -649,7 +659,11 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
                 ),
             )
         })?;
-    log::info!("successfully polled volume {:?}", volume);
+    let volume_id = volume.volume_id().unwrap();
+    log::info!(
+        "successfully polled volume {:?} with volume id '{volume_id}'",
+        volume
+    );
 
     if need_mkfs {
         ec2::disk::make_filesystem(&opts.filesystem_name, &opts.block_device_name)?;
@@ -719,6 +733,18 @@ pub async fn execute(opts: Flags) -> io::Result<()> {
             break;
         }
     }
+
+    let current_ebs_volume_id_file_path = Path::new(&opts.current_ebs_volume_id_file_path);
+    log::info!(
+        "writing volume id '{volume_id}' in '{}'",
+        current_ebs_volume_id_file_path.display()
+    );
+    let mut f = File::create(current_ebs_volume_id_file_path)?;
+    f.write_all(volume_id.as_bytes())?;
+    log::info!(
+        "wrote volume id '{volume_id}' in '{}'",
+        current_ebs_volume_id_file_path.display()
+    );
 
     log::info!("successfully mounted and provisioned the volume!");
     Ok(())

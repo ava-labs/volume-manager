@@ -68,9 +68,14 @@ async fn main() -> io::Result<()> {
         .get_one::<String>("FILESYSTEM_NAME")
         .unwrap_or(&String::from("ext4"))
         .clone();
+
     let mount_directory_path = matches
         .get_one::<String>("MOUNT_DIRECTORY_PATH")
         .unwrap_or(&String::from("/data"))
+        .clone();
+    let current_ebs_volume_id_file_path = matches
+        .get_one::<String>("CURRENT_EBS_VOLUME_ID_FILE_PATH")
+        .unwrap_or(&String::from("/data/current_ebs_volume_id"))
         .clone();
 
     let opts = command::Flags {
@@ -92,6 +97,7 @@ async fn main() -> io::Result<()> {
         block_device_name,
         filesystem_name,
         mount_directory_path,
+        current_ebs_volume_id_file_path,
     };
     command::execute(opts).await
 }
