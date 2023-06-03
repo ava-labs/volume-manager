@@ -15,7 +15,7 @@ async fn main() -> io::Result<()> {
 
     let initial_wait_random_seconds = matches
         .get_one::<u32>("INITIAL_WAIT_RANDOM_SECONDS")
-        .unwrap_or(&20)
+        .unwrap_or(&10)
         .clone();
 
     let id_tag_key = matches.get_one::<String>("ID_TAG_KEY").unwrap().clone();
@@ -30,7 +30,7 @@ async fn main() -> io::Result<()> {
 
     let find_reusable_retries = matches
         .get_one::<usize>("FIND_REUSABLE_RETRIES")
-        .unwrap_or(&10)
+        .unwrap_or(&5)
         .clone();
 
     let volume_type = matches
